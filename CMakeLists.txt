@@ -107,3 +107,23 @@ target_link_libraries(clang-format-cli PRIVATE
     "-s ENVIRONMENT=node"
     "-s NODERAWFS=1"
 )
+
+# Standalone WASM target - no JS glue, pure C exports for wasmi/wasmtime
+add_executable(clang-format-standalone src/lib.cc src/wasi_binding.cc)
+target_include_directories(clang-format-standalone PRIVATE ${LLVM_INCLUDE_DIRS})
+target_compile_features(clang-format-standalone PRIVATE cxx_std_17)
+target_compile_options(clang-format-standalone PRIVATE
+    -Os
+    -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0
+)
+
+target_link_libraries(clang-format-standalone PRIVATE
+    ${LLVM_LIBRARIES}
+    "-fno-rtti"
+    "-s ALLOW_MEMORY_GROWTH=1"
+    "-s ASSERTIONS=0"
+    "-s DYNAMIC_EXECUTION=0"
+    "-s STANDALONE_WASM=1"
+    "-s EXPORTED_FUNCTIONS=['_wasm_alloc','_wasm_dealloc','_wasm_init','_wasm_set_style','_wasm_set_fallback_style','_wasm_format','_wasm_get_result_status','_wasm_get_result_ptr','_wasm_get_result_len','_wasm_free_result','_wasm_version','_wasm_version_len']"
+    "-s ERROR_ON_UNDEFINED_SYMBOLS=0"
+)
