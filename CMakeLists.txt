@@ -120,10 +120,11 @@ target_compile_options(clang-format-standalone PRIVATE
 target_link_libraries(clang-format-standalone PRIVATE
     ${LLVM_LIBRARIES}
     "-fno-rtti"
+    "--no-entry"
     "-s ALLOW_MEMORY_GROWTH=1"
     "-s ASSERTIONS=0"
     "-s DYNAMIC_EXECUTION=0"
     "-s STANDALONE_WASM=1"
-    "-s EXPORTED_FUNCTIONS=['_wasm_alloc','_wasm_dealloc','_wasm_init','_wasm_set_style','_wasm_set_fallback_style','_wasm_format','_wasm_get_result_status','_wasm_get_result_ptr','_wasm_get_result_len','_wasm_free_result','_wasm_version','_wasm_version_len']"
+    "-s EXPORTED_FUNCTIONS=['_wasm_alloc','_wasm_dealloc','_wasm_init','_wasm_set_style','_wasm_set_fallback_style','_wasm_format','_wasm_get_result_ptr','_wasm_get_result_len','_wasm_free_result','_wasm_version','_wasm_version_len','_malloc','_free']"
     "-s ERROR_ON_UNDEFINED_SYMBOLS=0"
 )

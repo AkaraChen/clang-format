@@ -5,26 +5,42 @@
 #include <cstring>
 #include <cstdlib>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#define WASM_EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define WASM_EXPORT
+#endif
+
 // Global formatter instance
 static ClangFormat* g_formatter = nullptr;
+
+// Result structure in linear memory
+struct WasmResult {
+    int32_t status;      // 0 = Success, 1 = Error, 2 = Unchanged
+    char* content_ptr;
+    int32_t content_len;
+};
+
+static WasmResult g_last_result = {0, nullptr, 0};
 
 // Memory management helpers - these will be called from Rust
 extern "C" {
 
 // Allocate memory in WASM linear memory
-__attribute__((export_name("alloc")))
+WASM_EXPORT
 void* wasm_alloc(size_t size) {
     return malloc(size);
 }
 
 // Free memory in WASM linear memory
-__attribute__((export_name("dealloc")))
+WASM_EXPORT
 void wasm_dealloc(void* ptr) {
     free(ptr);
 }
 
 // Initialize the formatter
-__attribute__((export_name("init")))
+WASM_EXPORT
 void wasm_init() {
     if (g_formatter == nullptr) {
         g_formatter = new ClangFormat();
@@ -32,8 +48,8 @@ void wasm_init() {
 }
 
 // Set style (returns 0 on success)
-__attribute__((export_name("set_style")))
-int wasm_set_style(const char* style, size_t style_len) {
+WASM_EXPORT
+int wasm_set_style(const char* style, int style_len) {
     if (g_formatter == nullptr) return -1;
     std::string s(style, style_len);
     g_formatter->with_style(s);
@@ -41,34 +57,24 @@ int wasm_set_style(const char* style, size_t style_len) {
 }
 
 // Set fallback style (returns 0 on success)
-__attribute__((export_name("set_fallback_style")))
-int wasm_set_fallback_style(const char* style, size_t style_len) {
+WASM_EXPORT
+int wasm_set_fallback_style(const char* style, int style_len) {
     if (g_formatter == nullptr) return -1;
     std::string s(style, style_len);
     g_formatter->with_fallback_style(s);
     return 0;
 }
 
-// Result structure in linear memory
-// Layout: [status: i32][content_ptr: i32][content_len: i32]
-struct WasmResult {
-    int32_t status;      // 0 = Success, 1 = Error, 2 = Unchanged
-    char* content_ptr;
-    int32_t content_len;
-};
-
-static WasmResult g_last_result;
-
-// Format code
-// Returns pointer to WasmResult struct
-__attribute__((export_name("format")))
-WasmResult* wasm_format(const char* code, size_t code_len, 
-                        const char* filename, size_t filename_len) {
+// Format code - stores result in global, returns status
+// 0 = Success, 1 = Error, 2 = Unchanged
+WASM_EXPORT
+int wasm_format(const char* code, int code_len, 
+                const char* filename, int filename_len) {
     if (g_formatter == nullptr) {
         g_last_result.status = 1; // Error
         g_last_result.content_ptr = nullptr;
         g_last_result.content_len = 0;
-        return &g_last_result;
+        return 1;
     }
     
     // Free previous result content if any
@@ -103,29 +109,23 @@ WasmResult* wasm_format(const char* code, size_t code_len,
         g_last_result.content_len = 0;
     }
     
-    return &g_last_result;
-}
-
-// Get result status from last format call
-__attribute__((export_name("get_result_status")))
-int32_t wasm_get_result_status() {
     return g_last_result.status;
 }
 
 // Get result content pointer from last format call
-__attribute__((export_name("get_result_ptr")))
+WASM_EXPORT
 char* wasm_get_result_ptr() {
     return g_last_result.content_ptr;
 }
 
 // Get result content length from last format call
-__attribute__((export_name("get_result_len")))
-int32_t wasm_get_result_len() {
+WASM_EXPORT
+int wasm_get_result_len() {
     return g_last_result.content_len;
 }
 
 // Free result content
-__attribute__((export_name("free_result")))
+WASM_EXPORT
 void wasm_free_result() {
     if (g_last_result.content_ptr != nullptr) {
         free(g_last_result.content_ptr);
@@ -134,16 +134,16 @@ void wasm_free_result() {
     }
 }
 
-// Get version string
-__attribute__((export_name("version")))
+// Get version string pointer
+WASM_EXPORT
 const char* wasm_version() {
     static std::string ver = ClangFormat::version();
     return ver.c_str();
 }
 
 // Get version string length
-__attribute__((export_name("version_len")))
-int32_t wasm_version_len() {
+WASM_EXPORT
+int wasm_version_len() {
     static std::string ver = ClangFormat::version();
     return ver.size();
 }
